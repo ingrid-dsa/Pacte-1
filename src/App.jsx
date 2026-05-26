@@ -1245,86 +1245,78 @@ function ScreenSynthese({ appState, updateNotes }) {
     const obsHTML = indicatorsWithData.map(ind => {
       const obs = allObs.filter(o => o.indicatorKey === ind.key);
       const avg = (obs.reduce((sum, o) => sum + o.value, 0) / obs.length).toFixed(1);
-      const notesHTML = obs.filter(o => o.notes).map(o => `<li style="margin-bottom:8px"><strong>${new Date(o.date).toLocaleDateString()} :</strong> ${o.notes}</li>`).join('');
+      const notesHTML = obs.filter(o => o.notes).map(o => "<li style=\"margin-bottom:8px\"><strong>" + new Date(o.date).toLocaleDateString() + " :</strong> " + o.notes + "</li>").join('');
       
-      return `
-        <div style="margin-bottom: 20px;">
-          <h3>${ind.name} (Moyenne : ${avg}/10, Dernière : ${obs[obs.length-1].value}/10, Saisies : ${obs.length})</h3>
-          ${notesHTML ? `<ul style="padding-left:20px">${notesHTML}</ul>` : '<p style="color:#666"><i>Aucune note renseignée pour cet indicateur.</i></p>'}
-        </div>
-      `;
+      let res = "<div style=\"margin-bottom: 20px;\">";
+      res += "<h3>" + ind.name + " (Moyenne : " + avg + "/10, Dernière : " + obs[obs.length-1].value + "/10, Saisies : " + obs.length + ")</h3>";
+      if (notesHTML) {
+        res += "<ul style=\"padding-left:20px\">" + notesHTML + "</ul>";
+      } else {
+        res += "<p style=\"color:#666\"><i>Aucune note renseignée pour cet indicateur.</i></p>";
+      }
+      res += "</div>";
+      return res;
     }).join('');
 
-    const tableRows = allObs.map(o => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${new Date(o.date).toLocaleDateString()}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.indicatorName}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.value} / 10</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.notes || ''}</td>
-      </tr>
-    `).join('');
+    const tableRows = allObs.map(o => {
+      let r = "<tr>";
+      r += "<td style=\"padding: 8px; border-bottom: 1px solid #eee;\">" + new Date(o.date).toLocaleDateString() + "</td>";
+      r += "<td style=\"padding: 8px; border-bottom: 1px solid #eee;\">" + o.indicatorName + "</td>";
+      r += "<td style=\"padding: 8px; border-bottom: 1px solid #eee;\">" + o.value + " / 10</td>";
+      r += "<td style=\"padding: 8px; border-bottom: 1px solid #eee;\">" + (o.notes || '') + "</td>";
+      r += "</tr>";
+      return r;
+    }).join('');
+    
+    let tableContainer = "";
+    if (allObs.length > 0) {
+      tableContainer += "<table><thead><tr>";
+      tableContainer += "<th>Date</th><th>Indicateur</th><th>Valeur</th><th>Notes</th>";
+      tableContainer += "</tr></thead><tbody>" + tableRows + "</tbody></table>";
+    } else {
+      tableContainer += "<p>Aucune observation.</p>";
+    }
 
-    const html = `
-      <html>
-        <head>
-          <title>Synthèse de suivi - Pacte</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #333; line-height: 1.5; padding: 20px; max-width: 800px; margin: 0 auto; }
-            h1 { color: #35462D; border-bottom: 2px solid #E8E7E1; padding-bottom: 10px; display: flex; align-items: center; gap: 15px; }
-            h2 { color: #4F7C72; margin-top: 35px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-            h3 { color: #555; margin-bottom: 10px; font-size: 16px; }
-            .header { margin-bottom: 40px; }
-            .notes-section { background: #f9f9f9; padding: 15px; border-left: 4px solid #7C9A92; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
-            .disclaimer { font-size: 12px; color: #888; margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-            th { text-align: left; padding: 8px; background: #f9f9f7; border-bottom: 2px solid #E8E7E1; color: #555; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1><img src="\${window.location.origin}/src/assets/LogoPacte2.png" alt="Logo" style="height: 40px;" /> Synthèse de suivi</h1>
-            <p><strong>Date de début du suivi :</strong> ${new Date(appState.startDate).toLocaleDateString()}</p>
-            <p><strong>Prochaine consultation :</strong> ${appState.rdvDate ? new Date(appState.rdvDate).toLocaleDateString() : 'Non définie'}</p>
-          </div>
-          
-          <h2>Indicateurs suivis</h2>
-          \${obsHTML || '<p>Aucune donnée saisie.</p>'}
-
-          <h2>Récapitulatif des observations</h2>
-          \${allObs.length > 0 ? \`
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Indicateur</th>
-                <th>Valeur</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              \${tableRows}
-            </tbody>
-          </table>
-          \` : '<p>Aucune observation.</p>'}
-
-          <h2>Notes de préparation pour le rendez-vous</h2>
-          <div class="notes-section">
-            <h3 style="margin-top:0">Évolutions notables</h3>
-            <p style="margin-bottom:0; white-space: pre-wrap;">\${evolutions || '<i>Non renseigné</i>'}</p>
-          </div>
-          <div class="notes-section">
-            <h3 style="margin-top:0">Points à signaler</h3>
-            <p style="margin-bottom:0; white-space: pre-wrap;">\${points || '<i>Non renseigné</i>'}</p>
-          </div>
-          <div class="notes-section">
-            <h3 style="margin-top:0">Questions à poser</h3>
-            <p style="margin-bottom:0; white-space: pre-wrap;">\${questions || '<i>Non renseigné</i>'}</p>
-          </div>
-
-          <p class="disclaimer">Cette synthèse prépare l'échange médical. Elle ne remplace pas l'avis d'un professionnel de santé.</p>
-        </body>
-      </html>
-    \`;
+    const startD = new Date(appState.startDate).toLocaleDateString();
+    const rdvD = appState.rdvDate ? new Date(appState.rdvDate).toLocaleDateString() : 'Non définie';
+    
+    let html = "<html><head><title>Synthèse de suivi - Pacte</title>";
+    html += "<style>";
+    html += "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.5; padding: 20px; max-width: 800px; margin: 0 auto; }";
+    html += "h1 { color: #35462D; border-bottom: 2px solid #E8E7E1; padding-bottom: 10px; display: flex; align-items: center; gap: 15px; }";
+    html += "h2 { color: #4F7C72; margin-top: 35px; border-bottom: 1px solid #eee; padding-bottom: 5px; }";
+    html += "h3 { color: #555; margin-bottom: 10px; font-size: 16px; }";
+    html += ".header { margin-bottom: 40px; }";
+    html += ".notes-section { background: #f9f9f9; padding: 15px; border-left: 4px solid #7C9A92; margin-bottom: 20px; border-radius: 0 8px 8px 0; }";
+    html += ".disclaimer { font-size: 12px; color: #888; margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }";
+    html += "table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }";
+    html += "th { text-align: left; padding: 8px; background: #f9f9f7; border-bottom: 2px solid #E8E7E1; color: #555; }";
+    html += "</style></head><body>";
+    
+    html += "<div class=\"header\">";
+    html += "<h1><img src=\"" + window.location.origin + "/src/assets/LogoPacte2.png\" alt=\"Logo\" style=\"height: 40px;\" /> Synthèse de suivi</h1>";
+    html += "<p><strong>Date de début du suivi :</strong> " + startD + "</p>";
+    html += "<p><strong>Prochaine consultation :</strong> " + rdvD + "</p>";
+    html += "</div>";
+    
+    html += "<h2>Indicateurs suivis</h2>";
+    html += (obsHTML || "<p>Aucune donnée saisie.</p>");
+    
+    html += "<h2>Récapitulatif des observations</h2>";
+    html += tableContainer;
+    
+    html += "<h2>Notes de préparation pour le rendez-vous</h2>";
+    html += "<div class=\"notes-section\"><h3 style=\"margin-top:0\">Évolutions notables</h3>";
+    html += "<p style=\"margin-bottom:0; white-space: pre-wrap;\">" + (evolutions || "<i>Non renseigné</i>") + "</p></div>";
+    
+    html += "<div class=\"notes-section\"><h3 style=\"margin-top:0\">Points à signaler</h3>";
+    html += "<p style=\"margin-bottom:0; white-space: pre-wrap;\">" + (points || "<i>Non renseigné</i>") + "</p></div>";
+    
+    html += "<div class=\"notes-section\"><h3 style=\"margin-top:0\">Questions à poser</h3>";
+    html += "<p style=\"margin-bottom:0; white-space: pre-wrap;\">" + (questions || "<i>Non renseigné</i>") + "</p></div>";
+    
+    html += "<p class=\"disclaimer\">Cette synthèse prépare l'échange médical. Elle ne remplace pas l'avis d'un professionnel de santé.</p>";
+    html += "</body></html>";
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
