@@ -595,7 +595,7 @@ function ProgressRing({ progressPercent = 66, days = 32 }) {
     >
       <svg className="ring-svg" viewBox="0 0 236 236">
         <circle className="ring-track" cx={CX} cy={CY} r={R} />
-        <g transform={`rotate(-90 ${CX} ${CY})`}>
+        <g transform={"rotate(-90 " + CX + " " + CY + ")"}>
           <circle
             className="ring-prog"
             cx={CX} cy={CY} r={R}
@@ -603,7 +603,7 @@ function ProgressRing({ progressPercent = 66, days = 32 }) {
             strokeDashoffset={offset}
           />
         </g>
-        <g className="ring-dotgroup" style={{ transform: `rotate(${dotAngle}deg)` }}>
+        <g className="ring-dotgroup" style={{ transform: "rotate(" + dotAngle + "deg)" }}>
           <circle cx={CX} cy={CY - R} r="8" fill="#D9BB84" />
           <circle cx={CX} cy={CY - R} r="3.4" fill="#35462D" />
         </g>
@@ -657,7 +657,7 @@ function IndicatorChart({ observations, color = "#35462D", showLabels = true }) 
   return (
     <svg width="100%" height={h} viewBox={chartViewBox} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
       {[1, 5, 10].map(val => (
-        <g key={`grid-${val}`}>
+        <g key={"grid-" + val}>
           <line x1={padH} y1={getY(val)} x2={w - padH} y2={getY(val)} stroke="#E8E7E1" strokeWidth="1" strokeDasharray="2 2" />
           <text x={padH - 6} y={getY(val) + 3} fontSize="9" fill="var(--muted)" textAnchor="end">{val}</text>
         </g>
@@ -665,7 +665,7 @@ function IndicatorChart({ observations, color = "#35462D", showLabels = true }) 
 
       {pts.length > 1 && (
         <polyline
-          points={pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
+          points={pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}
           fill="none" stroke={color} strokeWidth="2"
           strokeLinecap="round" strokeLinejoin="round"
         />
@@ -1031,13 +1031,13 @@ function ScreenIndicateurs({ go, openObs, appState, indicators, addIndicator }) 
           <div
             key={ind.key}
             className="card reveal"
-            style={{ animationDelay: `${0.05 + i * 0.06}s`, padding: "15px 16px", marginBottom: "12px", cursor: "pointer", transition: "transform .12s ease" }}
+            style={{ animationDelay: (0.05 + i * 0.06) + "s", padding: "15px 16px", marginBottom: "12px", cursor: "pointer", transition: "transform .12s ease" }}
             onClick={() => openObs(ind.key)}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div className="ind-main">
                 <div className="ind-name">{ind.name}</div>
-                <div className="ind-trend">{obs.length > 0 ? `Dernière saisie le ${new Date(obs[obs.length-1].date).toLocaleDateString()}` : "Aucune saisie"}</div>
+                <div className="ind-trend">{obs.length > 0 ? "Dernière saisie le " + new Date(obs[obs.length-1].date).toLocaleDateString() : "Aucune saisie"}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 {obs.length > 0 && <div className="ind-val">{obs[obs.length-1].value}<small>&#8201;/&#8201;10</small></div>}
@@ -1355,7 +1355,7 @@ function ScreenSynthese({ appState, updateNotes }) {
               {[1, 5, 10].map(val => {
                 const y = pad + (1 - val / 10) * (H - pad * 2);
                 return (
-                  <g key={`s-grid-${val}`}>
+                  <g key={"s-grid-" + val}>
                     <line x1={pad + 15} y1={y} x2={W - pad} y2={y} stroke="#E8E7E1" strokeWidth="1" strokeDasharray="2 2" />
                     <text x={pad + 10} y={y + 3} fontSize="9" fill="var(--muted)" textAnchor="end">{val}</text>
                   </g>
@@ -1399,7 +1399,7 @@ function ScreenSynthese({ appState, updateNotes }) {
         const withNotes = obs.filter(o => o.notes);
         
         return (
-          <div key={ind.key} className="card obs-item reveal" style={{ animationDelay: `${0.1 + i * 0.05}s`, padding: "16px", marginBottom: 12 }}>
+          <div key={ind.key} className="card obs-item reveal" style={{ animationDelay: (0.1 + i * 0.05) + "s", padding: "16px", marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <span style={{ fontWeight: 600, color: "var(--ink)", fontSize: 15 }}>{ind.name}</span>
               <span style={{ color: "var(--slate)", fontSize: 13 }}>Moyenne : <strong style={{ color: "var(--green)" }}>{avg}</strong> / 10</span>
@@ -1510,7 +1510,7 @@ function ScreenRessources() {
             <div
               key={ri}
               className="card res-row reveal"
-              style={{ animationDelay: `${0.1 + (gi * 3 + ri) * 0.05}s` }}
+              style={{ animationDelay: (0.1 + (gi * 3 + ri) * 0.05) + "s" }}
             >
               <div className="res-ic">
                 <Icon name={r.ic} size={20} stroke={1.6} color="#35462D" />
