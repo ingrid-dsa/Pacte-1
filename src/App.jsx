@@ -652,7 +652,7 @@ function IndicatorChart({ observations, color = "#35462D", showLabels = true }) 
     return [x, y, obs];
   });
 
-  const chartViewBox = `0 0 ${w} ${h}`;
+  const chartViewBox = "0 0 " + w + " " + h;
 
   return (
     <svg width="100%" height={h} viewBox={chartViewBox} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
@@ -1333,7 +1333,7 @@ function ScreenSynthese({ appState, updateNotes }) {
     }, 500);
   };
 
-  const chartViewBox = `0 0 ${W} ${H}`;
+  const chartViewBox = "0 0 " + W + " " + H;
 
   return (
     <div className="screen">
