@@ -633,40 +633,52 @@ function IndicatorChart({ observations, color = "#35462D", showLabels = true }) 
     return <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", padding: "10px 0" }}>Aucune saisie pour le moment.</div>;
   }
 
-  const w = 280, h = 60, pad = 12, bottomPad = showLabels ? 20 : 12;
-  const graphW = w - pad * 2;
-  const graphH = h - bottomPad - pad;
+  const w = 280, h = 90, padH = 24, padV = 16, bottomPad = 20;
+  const graphW = w - padH * 2;
+  const graphH = h - bottomPad - padV;
   
   const getX = (i) => {
     if (observations.length === 1) return w / 2;
-    return pad + (i / (observations.length - 1)) * graphW;
+    return padH + (i / (observations.length - 1)) * graphW;
+  };
+
+  const getY = (val) => {
+    return padV + (1 - val / 10) * graphH;
   };
 
   const pts = observations.map((obs, i) => {
     const x = getX(i);
-    const y = pad + (1 - obs.value / 10) * graphH;
+    const y = getY(obs.value);
     return [x, y, obs];
   });
 
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
+      {[1, 5, 10].map(val => (
+        <g key={`grid-${val}`}>
+          <line x1={padH} y1={getY(val)} x2={w - padH} y2={getY(val)} stroke="#E8E7E1" strokeWidth="1" strokeDasharray="2 2" />
+          <text x={padH - 6} y={getY(val) + 3} fontSize="9" fill="var(--muted)" textAnchor="end">{val}</text>
+        </g>
+      ))}
+
       {pts.length > 1 && (
         <polyline
           points={pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
           fill="none" stroke={color} strokeWidth="2"
           strokeLinecap="round" strokeLinejoin="round"
-          opacity="0.5"
         />
       )}
       {pts.map((p, i) => (
         <g key={i}>
-          <circle cx={p[0]} cy={p[1]} r="4" fill={i === pts.length - 1 ? color : "#8E918A"} />
+          <circle cx={p[0]} cy={p[1]} r="4" fill={color} />
           {showLabels && (
             <>
               <text x={p[0]} y={p[1] - 8} fontSize="10" fill="var(--ink)" textAnchor="middle" fontWeight="600">{p[2].value}</text>
-              <text x={p[0]} y={h - 2} fontSize="9" fill="var(--muted)" textAnchor="middle">
-                {new Date(p[2].date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
-              </text>
+              {(i === 0 || i === pts.length - 1 || (observations.length > 3 && i % Math.ceil(observations.length / 3) === 0)) && (
+                <text x={p[0]} y={h - 2} fontSize="9" fill="var(--muted)" textAnchor="middle">
+                  {new Date(p[2].date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                </text>
+              )}
             </>
           )}
         </g>
@@ -917,7 +929,7 @@ function ScreenSuivi({ go, appState, updateCycle, resetCycle }) {
       <div className="btn-row reveal" style={{ animationDelay: ".2s" }}>
         <button className="btn btn-primary" onClick={() => go("observation")}>
           <Icon name="plus" size={18} stroke={2} color="#F4F2EC" />
-          Ajouter une observation
+          + Suivi
         </button>
         <button className="btn btn-ghost" onClick={() => go("synthese")}>
           Voir ma synthèse
@@ -984,7 +996,20 @@ function ScreenSuivi({ go, appState, updateCycle, resetCycle }) {
 }
 
 /* ---------------- SCREEN : INDICATEURS ---------------- */
-function ScreenIndicateurs({ go, openObs, appState, indicators }) {
+function ScreenIndicateurs({ go, openObs, appState, indicators, addIndicator }) {
+  const [showModal, setShowModal] = useState(false);
+  const [newInd, setNewInd] = useState("");
+  
+  const suggestions = ["Sommeil", "Humeur", "Mobilité", "Effets secondaires", "Appétit", "Stress"];
+
+  const handleAdd = () => {
+    if (newInd.trim()) {
+      addIndicator(newInd.trim());
+      setShowModal(false);
+      setNewInd("");
+    }
+  };
+
   return (
     <div className="screen">
       <div className="appbar">
@@ -992,9 +1017,9 @@ function ScreenIndicateurs({ go, openObs, appState, indicators }) {
         <span className="ghost" />
       </div>
       <div className="kicker">Mes indicateurs</div>
-      <h1 className="title">Suivre ce que<br />nous avons choisi</h1>
+      <h1 className="title">Suivre l’évolution<br />de mes symptômes</h1>
       <p className="section-intro">
-        Les indicateurs définis avec votre médecin lors de la consultation de délibération.
+        Cette section vous permet de suivre les indicateurs définis avec votre médecin lors de la dernière consultation.
       </p>
 
       {indicators.map((ind, i) => {
@@ -1024,11 +1049,32 @@ function ScreenIndicateurs({ go, openObs, appState, indicators }) {
       })}
 
       <div className="btn-row" style={{ marginTop: 16 }}>
-        <button className="btn btn-primary" onClick={() => openObs("fatigue")}>
+        <button className="btn btn-primary" onClick={() => openObs(indicators[0]?.key || "fatigue")}>
           <Icon name="plus" size={18} stroke={2} color="#F4F2EC" />
-          Ajouter une observation
+          Noter mon ressenti
+        </button>
+        <button className="btn btn-ghost" onClick={() => setShowModal(true)}>
+          Ajouter un indicateur
         </button>
       </div>
+
+      {showModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div className="card" style={{ padding: 24, width: "100%", maxWidth: 360, background: "var(--paper)" }}>
+            <h2 style={{ fontSize: 18, marginBottom: 16, fontFamily: "var(--serif)", color: "var(--ink)" }}>Ajouter un indicateur à suivre</h2>
+            <div className="chips" style={{ marginBottom: 16 }}>
+              {suggestions.map(s => (
+                <button key={s} className={"chip" + (newInd === s ? " on" : "")} onClick={() => setNewInd(s)}>{s}</button>
+              ))}
+            </div>
+            <input type="text" className="text-input" placeholder="Ou écrire un autre indicateur" value={newInd} onChange={e => setNewInd(e.target.value)} style={{ marginBottom: 24 }} />
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAdd}>Ajouter</button>
+              <button className="btn btn-ghost" style={{ flex: 1, border: "1px solid var(--line)" }} onClick={() => setShowModal(false)}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1133,9 +1179,6 @@ function ScreenObservation({ back, startKey, indicators, onSave }) {
           <button className="btn btn-primary" onClick={handleSave}>
             Enregistrer l&#8217;observation
           </button>
-          <button className="btn btn-text" onClick={nextIndicator}>
-            Ajouter un autre indicateur
-          </button>
         </div>
       ) : (
         <div className="confirm">
@@ -1145,10 +1188,7 @@ function ScreenObservation({ back, startKey, indicators, onSave }) {
           <h4>Observation enregistrée</h4>
           <p>Elle apparaîtra dans votre synthèse, pour préparer le prochain échange.</p>
           <div className="btn-row" style={{ marginTop: 16 }}>
-            <button className="btn btn-ghost" onClick={nextIndicator}>
-              Ajouter un autre indicateur
-            </button>
-            <button className="btn btn-text" onClick={back}>
+            <button className="btn btn-primary" onClick={back}>
               Revenir au suivi
             </button>
           </div>
@@ -1182,7 +1222,7 @@ function ScreenSynthese({ appState, updateNotes }) {
   const getPoints = (obsList) => {
     return obsList.map(obs => {
       const idx = allObs.findIndex(o => o.id === obs.id);
-      const x = pad + (allObs.length > 1 ? (idx / (allObs.length - 1)) * (W - pad * 2) : (W - pad * 2) / 2);
+      const x = pad + 15 + (allObs.length > 1 ? (idx / (allObs.length - 1)) * (W - pad * 2 - 15) : (W - pad * 2 - 15) / 2);
       const y = pad + (1 - obs.value / 10) * (H - pad * 2);
       return [x, y];
     });
@@ -1308,7 +1348,15 @@ function ScreenSynthese({ appState, updateNotes }) {
         {allObs.length > 0 ? (
           <>
             <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
-              <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#E8E7E1" strokeWidth="1" />
+              {[1, 5, 10].map(val => {
+                const y = pad + (1 - val / 10) * (H - pad * 2);
+                return (
+                  <g key={`s-grid-${val}`}>
+                    <line x1={pad + 15} y1={y} x2={W - pad} y2={y} stroke="#E8E7E1" strokeWidth="1" strokeDasharray="2 2" />
+                    <text x={pad + 10} y={y + 3} fontSize="9" fill="var(--muted)" textAnchor="end">{val}</text>
+                  </g>
+                );
+              })}
               {indicatorsWithData.map((ind, i) => {
                 const obs = allObs.filter(o => o.indicatorKey === ind.key);
                 const pts = getPoints(obs);
@@ -1605,6 +1653,30 @@ export default function PacteApp() {
     localStorage.setItem("pacteCycleSettings", JSON.stringify(dataToSave));
   };
 
+  const addIndicator = (name) => {
+    setAppState((prev) => {
+      const existing = prev.indicators.find(ind => ind.name.toLowerCase() === name.toLowerCase());
+      if (existing) return prev;
+      
+      const key = "custom_" + Date.now();
+      const newIndicator = {
+        key,
+        name,
+        last: 0,
+        trend: "Nouveau",
+        spark: [0, 0, 0, 0, 0, 0]
+      };
+      const newState = {
+        ...prev,
+        indicators: [...prev.indicators, newIndicator]
+      };
+      
+      const { hasOnboarded, ...dataToSave } = newState;
+      localStorage.setItem("pacteCycleSettings", JSON.stringify(dataToSave));
+      return newState;
+    });
+  };
+
   const resetCycle = () => {
     localStorage.removeItem("pacteCycleSettings");
     setAppState({
@@ -1636,7 +1708,7 @@ export default function PacteApp() {
         <div className="body">
           {screen === "suivi" && <ScreenSuivi key="suivi" go={go} appState={appState} updateCycle={updateCycleSettings} resetCycle={resetCycle} />}
           {screen === "indicateurs" && (
-            <ScreenIndicateurs key="indicateurs" go={go} openObs={openObs} appState={appState} indicators={appState.indicators} />
+            <ScreenIndicateurs key="indicateurs" go={go} openObs={openObs} appState={appState} indicators={appState.indicators} addIndicator={addIndicator} />
           )}
           {screen === "observation" && (
             <ScreenObservation key="observation" back={back} startKey={obsKey} indicators={appState.indicators} onSave={saveObservation} />
