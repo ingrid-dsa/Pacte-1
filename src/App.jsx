@@ -652,8 +652,10 @@ function IndicatorChart({ observations, color = "#35462D", showLabels = true }) 
     return [x, y, obs];
   });
 
+  const chartViewBox = `0 0 ${w} ${h}`;
+
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
+    <svg width="100%" height={h} viewBox={chartViewBox} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
       {[1, 5, 10].map(val => (
         <g key={`grid-${val}`}>
           <line x1={padH} y1={getY(val)} x2={w - padH} y2={getY(val)} stroke="#E8E7E1" strokeWidth="1" strokeDasharray="2 2" />
@@ -1331,6 +1333,8 @@ function ScreenSynthese({ appState, updateNotes }) {
     }, 500);
   };
 
+  const chartViewBox = `0 0 ${W} ${H}`;
+
   return (
     <div className="screen">
       <div className="appbar">
@@ -1347,7 +1351,7 @@ function ScreenSynthese({ appState, updateNotes }) {
         </div>
         {allObs.length > 0 ? (
           <>
-            <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+            <svg width="100%" viewBox={chartViewBox} style={{ overflow: "visible" }}>
               {[1, 5, 10].map(val => {
                 const y = pad + (1 - val / 10) * (H - pad * 2);
                 return (
