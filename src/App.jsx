@@ -1,6 +1,5 @@
-// test connexion Antigravity
 import React, { useState, useEffect, useRef } from "react";
-import logoImg from "./assets/LogoPacte.jpg";
+import logoImg from "./assets/LogoPacte2.png";
 
 /* ============================================================
    PACTE — Prototype d'interface de suivi de santé
@@ -618,43 +617,60 @@ function ProgressRing({ progressPercent = 66, days = 32 }) {
 }
 
 /* ---------------- MINI SPARKLINE ---------------- */
-function IndicatorChart({ observations }) {
+const IND_COLORS = {
+  "fatigue": "#35462D",
+  "douleur": "#4F7C72",
+  "sommeil": "#7C9A92",
+  "humeur": "#D9BB84",
+  "mobilite": "#9BAF88",
+  "effets": "#B88A5A"
+};
+const FALLBACK_COLORS = ["#35462D", "#4F7C72", "#7C9A92", "#D9BB84", "#9BAF88", "#B88A5A"];
+const getIndColor = (key, idx) => IND_COLORS[key] || FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+
+function IndicatorChart({ observations, color = "#35462D", showLabels = true }) {
   if (observations.length === 0) {
     return <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", padding: "10px 0" }}>Aucune saisie pour le moment.</div>;
   }
 
-  const w = 280, h = 50, pad = 8;
+  const w = 280, h = 60, pad = 12, bottomPad = showLabels ? 20 : 12;
+  const graphW = w - pad * 2;
+  const graphH = h - bottomPad - pad;
   
-  if (observations.length === 1) {
-    return (
-      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
-        <circle cx={w/2} cy={pad + (1 - observations[0].value / 10) * (h - pad * 2)} r="4" fill="#35462D" />
-      </svg>
-    );
-  }
+  const getX = (i) => {
+    if (observations.length === 1) return w / 2;
+    return pad + (i / (observations.length - 1)) * graphW;
+  };
 
-  const minTime = new Date(observations[0].date).getTime();
-  const maxTime = new Date(observations[observations.length - 1].date).getTime();
-  const timeSpan = Math.max(1, maxTime - minTime);
-
-  const pts = observations.map((obs) => {
-    const time = new Date(obs.date).getTime();
-    const x = pad + ((time - minTime) / timeSpan) * (w - pad * 2);
-    const y = pad + (1 - obs.value / 10) * (h - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  const pts = observations.map((obs, i) => {
+    const x = getX(i);
+    const y = pad + (1 - obs.value / 10) * graphH;
+    return [x, y, obs];
   });
 
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
-      <polyline
-        points={pts.join(" ")}
-        fill="none" stroke="#8E918A" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"
-      />
-      {observations.map((obs, i) => {
-        const pt = pts[i].split(",");
-        return <circle key={i} cx={pt[0]} cy={pt[1]} r="4" fill={i === observations.length - 1 ? "#35462D" : "#8E918A"} />;
-      })}
+      {pts.length > 1 && (
+        <polyline
+          points={pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
+          fill="none" stroke={color} strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round"
+          opacity="0.5"
+        />
+      )}
+      {pts.map((p, i) => (
+        <g key={i}>
+          <circle cx={p[0]} cy={p[1]} r="4" fill={i === pts.length - 1 ? color : "#8E918A"} />
+          {showLabels && (
+            <>
+              <text x={p[0]} y={p[1] - 8} fontSize="10" fill="var(--ink)" textAnchor="middle" fontWeight="600">{p[2].value}</text>
+              <text x={p[0]} y={h - 2} fontSize="9" fill="var(--muted)" textAnchor="middle">
+                {new Date(p[2].date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+              </text>
+            </>
+          )}
+        </g>
+      ))}
     </svg>
   );
 }
@@ -1002,7 +1018,7 @@ function ScreenIndicateurs({ go, openObs, appState, indicators }) {
               </div>
             </div>
             
-            <IndicatorChart observations={obs} />
+            <IndicatorChart observations={obs} color={getIndColor(ind.key, i)} />
           </div>
         );
       })}
@@ -1023,6 +1039,8 @@ function ScreenObservation({ back, startKey, indicators, onSave }) {
   const [value, setValue] = useState(5);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState(false);
+  
+  const todayLabel = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   
   const current = indicators.find((x) => x.key === indKey) || indicators[0];
   const pct = (value / 10) * 100;
@@ -1065,7 +1083,7 @@ function ScreenObservation({ back, startKey, indicators, onSave }) {
 
       <div className="kicker">Observation</div>
       <h1 className="title">Noter ce que<br />je ressens</h1>
-      <div className="obs-date">Aujourd&#8217;hui · 11 mai 2025</div>
+      <div className="obs-date">Aujourd&#8217;hui · {todayLabel}</div>
 
       <div className="chips">
         {indicators.map((ind) => (
@@ -1160,14 +1178,11 @@ function ScreenSynthese({ appState, updateNotes }) {
   );
 
   const allObs = [...(appState?.observations || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
-  const minTime = allObs.length > 0 ? new Date(allObs[0].date).getTime() : 0;
-  const maxTime = allObs.length > 0 ? new Date(allObs[allObs.length - 1].date).getTime() : 0;
-  const timeSpan = Math.max(1, maxTime - minTime);
 
   const getPoints = (obsList) => {
     return obsList.map(obs => {
-      const time = new Date(obs.date).getTime();
-      const x = pad + ((time - minTime) / timeSpan) * (W - pad * 2);
+      const idx = allObs.findIndex(o => o.id === obs.id);
+      const x = pad + (allObs.length > 1 ? (idx / (allObs.length - 1)) * (W - pad * 2) : (W - pad * 2) / 2);
       const y = pad + (1 - obs.value / 10) * (H - pad * 2);
       return [x, y];
     });
@@ -1192,11 +1207,20 @@ function ScreenSynthese({ appState, updateNotes }) {
       
       return `
         <div style="margin-bottom: 20px;">
-          <h3>${ind.name} (Moyenne : ${avg}/10, Dernière : ${obs[obs.length-1].value}/10)</h3>
+          <h3>${ind.name} (Moyenne : ${avg}/10, Dernière : ${obs[obs.length-1].value}/10, Saisies : ${obs.length})</h3>
           ${notesHTML ? `<ul style="padding-left:20px">${notesHTML}</ul>` : '<p style="color:#666"><i>Aucune note renseignée pour cet indicateur.</i></p>'}
         </div>
       `;
     }).join('');
+
+    const tableRows = allObs.map(o => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${new Date(o.date).toLocaleDateString()}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.indicatorName}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.value} / 10</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.notes || ''}</td>
+      </tr>
+    `).join('');
 
     const html = `
       <html>
@@ -1204,42 +1228,61 @@ function ScreenSynthese({ appState, updateNotes }) {
           <title>Synthèse de suivi - Pacte</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #333; line-height: 1.5; padding: 20px; max-width: 800px; margin: 0 auto; }
-            h1 { color: #35462D; border-bottom: 2px solid #E8E7E1; padding-bottom: 10px; }
+            h1 { color: #35462D; border-bottom: 2px solid #E8E7E1; padding-bottom: 10px; display: flex; align-items: center; gap: 15px; }
             h2 { color: #4F7C72; margin-top: 35px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
             h3 { color: #555; margin-bottom: 10px; font-size: 16px; }
             .header { margin-bottom: 40px; }
             .notes-section { background: #f9f9f9; padding: 15px; border-left: 4px solid #7C9A92; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
             .disclaimer { font-size: 12px; color: #888; margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+            th { text-align: left; padding: 8px; background: #f9f9f7; border-bottom: 2px solid #E8E7E1; color: #555; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>Synthèse de suivi</h1>
+            <h1><img src="\${window.location.origin}/src/assets/LogoPacte2.png" alt="Logo" style="height: 40px;" /> Synthèse de suivi</h1>
             <p><strong>Date de début du suivi :</strong> ${new Date(appState.startDate).toLocaleDateString()}</p>
             <p><strong>Prochaine consultation :</strong> ${appState.rdvDate ? new Date(appState.rdvDate).toLocaleDateString() : 'Non définie'}</p>
           </div>
           
           <h2>Indicateurs suivis</h2>
-          ${obsHTML || '<p>Aucune donnée saisie.</p>'}
+          \${obsHTML || '<p>Aucune donnée saisie.</p>'}
+
+          <h2>Récapitulatif des observations</h2>
+          \${allObs.length > 0 ? \`
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Indicateur</th>
+                <th>Valeur</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              \${tableRows}
+            </tbody>
+          </table>
+          \` : '<p>Aucune observation.</p>'}
 
           <h2>Notes de préparation pour le rendez-vous</h2>
           <div class="notes-section">
             <h3 style="margin-top:0">Évolutions notables</h3>
-            <p style="margin-bottom:0; white-space: pre-wrap;">${evolutions || '<i>Non renseigné</i>'}</p>
+            <p style="margin-bottom:0; white-space: pre-wrap;">\${evolutions || '<i>Non renseigné</i>'}</p>
           </div>
           <div class="notes-section">
             <h3 style="margin-top:0">Points à signaler</h3>
-            <p style="margin-bottom:0; white-space: pre-wrap;">${points || '<i>Non renseigné</i>'}</p>
+            <p style="margin-bottom:0; white-space: pre-wrap;">\${points || '<i>Non renseigné</i>'}</p>
           </div>
           <div class="notes-section">
             <h3 style="margin-top:0">Questions à poser</h3>
-            <p style="margin-bottom:0; white-space: pre-wrap;">${questions || '<i>Non renseigné</i>'}</p>
+            <p style="margin-bottom:0; white-space: pre-wrap;">\${questions || '<i>Non renseigné</i>'}</p>
           </div>
 
           <p class="disclaimer">Cette synthèse prépare l'échange médical. Elle ne remplace pas l'avis d'un professionnel de santé.</p>
         </body>
       </html>
-    `;
+    \`;
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
@@ -1268,7 +1311,6 @@ function ScreenSynthese({ appState, updateNotes }) {
               <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#E8E7E1" strokeWidth="1" />
               {indicatorsWithData.map((ind, i) => {
                 const obs = allObs.filter(o => o.indicatorKey === ind.key);
-                if (obs.length < 2 && allObs.length > 1) return null; // Wait for at least 2 points to draw line unless it's the only one
                 const pts = getPoints(obs);
                 const color = getColor(ind.key, i);
                 
