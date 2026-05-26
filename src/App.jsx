@@ -555,7 +555,7 @@ function Icon({ name, size = 22, stroke = 1.6, color = "currentColor", style }) 
 }
 
 /* ---------------- PROGRESS RING ---------------- */
-function ProgressRing({ progress = 0.66, days = 32 }) {
+function ProgressRing({ progressPercent = 66, days = 32 }) {
   const R = 92, CX = 118, CY = 118;
   const C = 2 * Math.PI * R;
   const [filled, setFilled] = useState(false);
@@ -581,7 +581,10 @@ function ProgressRing({ progress = 0.66, days = 32 }) {
     return () => { clearTimeout(t); cancelAnimationFrame(raf); };
   }, [days]);
 
-  const visualProgress = Math.max(0.015, progress);
+  // Handle NaN by defaulting to 0 or keeping it empty (0)
+  const validProgressPercent = isNaN(progressPercent) ? 0 : progressPercent;
+  const visualProgress = validProgressPercent / 100;
+  
   const offset = filled ? C * (1 - visualProgress) : C;
   const dotAngle = filled ? visualProgress * 360 : 0;
 
@@ -778,20 +781,29 @@ function ScreenSuivi({ go, appState }) {
   const remainingMs = rdv.getTime() - today.getTime();
   const remainingDays = Math.max(0, Math.round(remainingMs / (1000 * 60 * 60 * 24)));
   
-  let progress = NaN;
+  let progressPercent = NaN;
   const isRdvValid = rdvDate && !isNaN(rdv.getTime());
   const isStartValid = startDate && !isNaN(start.getTime());
 
   if (isRdvValid && isStartValid) {
     const elapsedMs = today.getTime() - start.getTime();
+    let progress = 0;
+    
     if (totalCycleMs > 0) {
       progress = elapsedMs / totalCycleMs;
-      if (elapsedMs < 0) progress = 0;
-      if (elapsedMs >= totalCycleMs) progress = 1;
-    } else {
-      progress = 0;
     }
-    progress = Math.max(0, Math.min(1, progress));
+
+    progressPercent = progress * 100;
+
+    if (elapsedMs < 0) {
+      progressPercent = 0;
+    } else if (elapsedMs >= totalCycleMs && totalCycleMs > 0) {
+      progressPercent = 100;
+    } else if (totalCycleMs === 0) {
+      progressPercent = 0;
+    }
+
+    progressPercent = Math.max(0, Math.min(100, progressPercent));
   }
 
   const rdvStr = rdv.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -827,7 +839,7 @@ function ScreenSuivi({ go, appState }) {
       </div>
 
       <div className="ring-wrap reveal" style={{ animationDelay: ".12s" }}>
-        <ProgressRing progress={progress} days={remainingDays} />
+        <ProgressRing progressPercent={progressPercent} days={remainingDays} />
         <p className="ring-note">
           Chaque observation vous aide à préparer le prochain échange avec votre médecin.
         </p>
