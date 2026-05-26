@@ -617,33 +617,53 @@ function ProgressRing({ progressPercent = 66, days = 32 }) {
 }
 
 /* ---------------- MINI SPARKLINE ---------------- */
-function Spark({ data }) {
-  const w = 52, h = 22, pad = 3;
-  const min = Math.min(...data), max = Math.max(...data);
-  const span = max - min || 1;
-  const pts = data.map((v, i) => {
-    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
-    const y = pad + (1 - (v - min) / span) * (h - pad * 2);
+function IndicatorChart({ observations }) {
+  if (observations.length === 0) {
+    return <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", padding: "10px 0" }}>Aucune saisie pour le moment.</div>;
+  }
+
+  const w = 280, h = 50, pad = 8;
+  
+  if (observations.length === 1) {
+    return (
+      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
+        <circle cx={w/2} cy={pad + (1 - observations[0].value / 10) * (h - pad * 2)} r="4" fill="#35462D" />
+      </svg>
+    );
+  }
+
+  const minTime = new Date(observations[0].date).getTime();
+  const maxTime = new Date(observations[observations.length - 1].date).getTime();
+  const timeSpan = Math.max(1, maxTime - minTime);
+
+  const pts = observations.map((obs) => {
+    const time = new Date(obs.date).getTime();
+    const x = pad + ((time - minTime) / timeSpan) * (w - pad * 2);
+    const y = pad + (1 - obs.value / 10) * (h - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
+
   return (
-    <svg className="spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: "visible", marginTop: 8 }}>
       <polyline
         points={pts.join(" ")}
-        fill="none" stroke="#8E918A" strokeWidth="1.6"
+        fill="none" stroke="#8E918A" strokeWidth="2"
         strokeLinecap="round" strokeLinejoin="round"
       />
-      <circle
-        cx={pts[pts.length - 1].split(",")[0]}
-        cy={pts[pts.length - 1].split(",")[1]}
-        r="2.6" fill="#35462D"
-      />
+      {observations.map((obs, i) => {
+        const pt = pts[i].split(",");
+        return <circle key={i} cx={pt[0]} cy={pt[1]} r="4" fill={i === observations.length - 1 ? "#35462D" : "#8E918A"} />;
+      })}
+    </svg>
+  );
+}
     </svg>
   );
 }
 
 /* ---------------- ONBOARDING ---------------- */
 function ScreenOnboarding({ onComplete }) {
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().substring(0, 10));
   const [rdvDate, setRdvDate] = useState("");
   const [selectedInds, setSelectedInds] = useState(new Set(["fatigue", "douleur"]));
   const [customIndName, setCustomIndName] = useState("");
@@ -679,12 +699,14 @@ function ScreenOnboarding({ onComplete }) {
   };
 
   const handleSubmit = () => {
+    if (!startDate) return alert("Veuillez indiquer la date de début du suivi.");
     if (!rdvDate) return alert("Veuillez indiquer la date de votre prochain rendez-vous.");
+    if (new Date(rdvDate) <= new Date(startDate)) return alert("La date du prochain rendez-vous doit être ultérieure à la date de début.");
     if (selectedInds.size === 0) return alert("Veuillez sélectionner au moins un indicateur.");
     const chosen = allInds.filter(i => selectedInds.has(i.key));
     onComplete({
       rdvDate,
-      startDate: new Date().toISOString(),
+      startDate: new Date(startDate).toISOString(),
       indicators: chosen.map(c => ({
         ...c,
         last: 0,
@@ -705,13 +727,25 @@ function ScreenOnboarding({ onComplete }) {
       </p>
 
       <div style={{ marginBottom: 36 }}>
-        <label className="field-label" style={{ marginTop: 0, color: 'var(--ink)' }}>Prochain rendez-vous</label>
-        <input 
-          type="date" 
-          value={rdvDate} 
-          onChange={e => setRdvDate(e.target.value)}
-          className="date-input"
-        />
+        <div style={{ marginBottom: 16 }}>
+          <label className="field-label" style={{ marginTop: 0, color: 'var(--ink)' }}>Date de début du suivi</label>
+          <input 
+            type="date" 
+            className="date-input"
+            value={startDate} 
+            onChange={e => setStartDate(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="field-label" style={{ marginTop: 0, color: 'var(--ink)' }}>Prochain rendez-vous</label>
+          <input 
+            type="date" 
+            className="date-input"
+            value={rdvDate} 
+            onChange={e => setRdvDate(e.target.value)}
+          />
+        </div>
       </div>
 
       <div style={{ marginBottom: 36 }}>
@@ -936,7 +970,7 @@ function ScreenSuivi({ go, appState, updateCycle, resetCycle }) {
 }
 
 /* ---------------- SCREEN : INDICATEURS ---------------- */
-function ScreenIndicateurs({ go, openObs, indicators }) {
+function ScreenIndicateurs({ go, openObs, appState, indicators }) {
   return (
     <div className="screen">
       <div className="appbar">
@@ -949,22 +983,31 @@ function ScreenIndicateurs({ go, openObs, indicators }) {
         Les indicateurs définis avec votre médecin lors de la consultation de délibération.
       </p>
 
-      {indicators.map((ind, i) => (
-        <div
-          key={ind.key}
-          className="card ind-card reveal"
-          style={{ animationDelay: `${0.05 + i * 0.06}s` }}
-          onClick={() => openObs(ind.key)}
-        >
-          <div className="ind-main">
-            <div className="ind-name">{ind.name}</div>
-            <div className="ind-trend">{ind.trend}</div>
+      {indicators.map((ind, i) => {
+        const obs = (appState.observations || []).filter(o => o.indicatorKey === ind.key).sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        return (
+          <div
+            key={ind.key}
+            className="card reveal"
+            style={{ animationDelay: `${0.05 + i * 0.06}s`, padding: "15px 16px", marginBottom: "12px", cursor: "pointer", transition: "transform .12s ease" }}
+            onClick={() => openObs(ind.key)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div className="ind-main">
+                <div className="ind-name">{ind.name}</div>
+                <div className="ind-trend">{obs.length > 0 ? `Dernière saisie le ${new Date(obs[obs.length-1].date).toLocaleDateString()}` : "Aucune saisie"}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {obs.length > 0 && <div className="ind-val">{obs[obs.length-1].value}<small>&#8201;/&#8201;10</small></div>}
+                <Icon name="chevron" size={16} stroke={1.8} color="#C8C8C8" />
+              </div>
+            </div>
+            
+            <IndicatorChart observations={obs} />
           </div>
-          <Spark data={ind.spark} />
-          <div className="ind-val">{ind.last}<small>&#8201;/&#8201;10</small></div>
-          <Icon name="chevron" size={16} stroke={1.8} color="#C8C8C8" />
-        </div>
-      ))}
+        );
+      })}
 
       <div className="btn-row" style={{ marginTop: 16 }}>
         <button className="btn btn-primary" onClick={() => openObs("fatigue")}>
@@ -977,7 +1020,7 @@ function ScreenIndicateurs({ go, openObs, indicators }) {
 }
 
 /* ---------------- SCREEN : OBSERVATION ---------------- */
-function ScreenObservation({ back, startKey, indicators }) {
+function ScreenObservation({ back, startKey, indicators, onSave }) {
   const [indKey, setIndKey] = useState(startKey || (indicators[0]?.key));
   const [value, setValue] = useState(5);
   const [notes, setNotes] = useState("");
@@ -998,6 +1041,20 @@ function ScreenObservation({ back, startKey, indicators }) {
   };
 
   if (!current) return null;
+
+  const handleSave = () => {
+    if (onSave) {
+      onSave({
+        id: Date.now(),
+        indicatorKey: indKey,
+        indicatorName: current.name,
+        value: value,
+        notes: notes,
+        date: new Date().toISOString()
+      });
+    }
+    setSaved(true);
+  };
 
   return (
     <div className="screen">
@@ -1057,7 +1114,7 @@ function ScreenObservation({ back, startKey, indicators }) {
 
       {!saved ? (
         <div className="btn-row" style={{ marginTop: 18 }}>
-          <button className="btn btn-primary" onClick={() => setSaved(true)}>
+          <button className="btn btn-primary" onClick={handleSave}>
             Enregistrer l&#8217;observation
           </button>
           <button className="btn btn-text" onClick={nextIndicator}>
@@ -1316,7 +1373,9 @@ export default function PacteApp() {
       hasOnboarded: false,
       rdvDate: "",
       startDate: "",
-      indicators: []
+      indicators: [],
+      observations: [],
+      preConsultationNotes: { evolutions: "", points: "", questions: "" }
     };
   });
   const [screen, setScreen] = useState("suivi");
@@ -1337,6 +1396,8 @@ export default function PacteApp() {
   const handleOnboarding = (data) => {
     const newState = {
       hasOnboarded: true,
+      observations: [],
+      preConsultationNotes: { evolutions: "", points: "", questions: "" },
       ...data
     };
     setAppState(newState);
@@ -1345,6 +1406,46 @@ export default function PacteApp() {
     if (data.indicators.length > 0) {
       setObsKey(data.indicators[0].key);
     }
+  };
+
+  const saveObservation = (obs) => {
+    setAppState((prev) => {
+      const newObservations = [...(prev.observations || []), obs];
+      const newIndicators = prev.indicators.map(ind => {
+        if (ind.key === obs.indicatorKey) {
+          const newSpark = [...ind.spark.slice(1), obs.value];
+          return {
+            ...ind,
+            last: obs.value,
+            trend: "Saisie enregistrée",
+            spark: newSpark
+          };
+        }
+        return ind;
+      });
+
+      const newState = {
+        ...prev,
+        observations: newObservations,
+        indicators: newIndicators
+      };
+
+      const { hasOnboarded, ...dataToSave } = newState;
+      localStorage.setItem("pacteCycleSettings", JSON.stringify(dataToSave));
+      return newState;
+    });
+  };
+
+  const updatePreConsultationNotes = (notes) => {
+    setAppState((prev) => {
+      const newState = {
+        ...prev,
+        preConsultationNotes: { ...(prev.preConsultationNotes || {}), ...notes }
+      };
+      const { hasOnboarded, ...dataToSave } = newState;
+      localStorage.setItem("pacteCycleSettings", JSON.stringify(dataToSave));
+      return newState;
+    });
   };
 
   const updateCycleSettings = (startDate, rdvDate) => {
@@ -1386,12 +1487,12 @@ export default function PacteApp() {
         <div className="body">
           {screen === "suivi" && <ScreenSuivi key="suivi" go={go} appState={appState} updateCycle={updateCycleSettings} resetCycle={resetCycle} />}
           {screen === "indicateurs" && (
-            <ScreenIndicateurs key="indicateurs" go={go} openObs={openObs} indicators={appState.indicators} />
+            <ScreenIndicateurs key="indicateurs" go={go} openObs={openObs} appState={appState} indicators={appState.indicators} />
           )}
           {screen === "observation" && (
-            <ScreenObservation key="observation" back={back} startKey={obsKey} indicators={appState.indicators} />
+            <ScreenObservation key="observation" back={back} startKey={obsKey} indicators={appState.indicators} onSave={saveObservation} />
           )}
-          {screen === "synthese" && <ScreenSynthese key="synthese" />}
+          {screen === "synthese" && <ScreenSynthese key="synthese" appState={appState} updateNotes={updatePreConsultationNotes} />}
           {screen === "ressources" && <ScreenRessources key="ressources" />}
         </div>
         <BottomNav screen={screen} go={go} />
