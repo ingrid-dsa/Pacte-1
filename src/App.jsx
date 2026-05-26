@@ -773,13 +773,14 @@ function ScreenSuivi({ go, appState }) {
   start.setHours(0, 0, 0, 0);
 
   const totalCycleMs = rdv.getTime() - start.getTime();
-  const totalCycleDays = Math.max(1, Math.ceil(totalCycleMs / (1000 * 60 * 60 * 24)));
+  const totalCycleDays = Math.max(1, Math.round(totalCycleMs / (1000 * 60 * 60 * 24)));
   
   const remainingMs = rdv.getTime() - today.getTime();
-  const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+  const remainingDays = Math.max(0, Math.round(remainingMs / (1000 * 60 * 60 * 24)));
   
-  const elapsedDays = totalCycleDays - remainingDays;
-  const progress = Math.min(1, Math.max(0, elapsedDays / totalCycleDays));
+  // Progress is proportional to elapsed time (e.g., 10 days elapsed out of 30 = 33%)
+  const elapsedDays = Math.max(0, totalCycleDays - remainingDays);
+  const progress = Math.min(1, elapsedDays / totalCycleDays);
 
   const rdvStr = rdv.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
