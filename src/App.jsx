@@ -764,9 +764,30 @@ const VALUE_WORD = (v) => {
 };
 
 /* ---------------- SCREEN : SUIVI ---------------- */
-function ScreenSuivi({ go, appState }) {
+function ScreenSuivi({ go, appState, updateCycle, resetCycle }) {
   const { rdvDate, startDate } = appState;
   
+  const [isEditing, setIsEditing] = useState(false);
+  const [editStart, setEditStart] = useState(startDate);
+  const [editRdv, setEditRdv] = useState(rdvDate);
+  const [editError, setEditError] = useState("");
+
+  const handleSaveCycle = () => {
+    if (!editStart || !editRdv) {
+      setEditError("Veuillez remplir les deux dates.");
+      return;
+    }
+    const dStart = new Date(editStart);
+    const dRdv = new Date(editRdv);
+    if (dRdv <= dStart) {
+      setEditError("La date de consultation doit être ultérieure à la date de début.");
+      return;
+    }
+    setEditError("");
+    updateCycle(editStart, editRdv);
+    setIsEditing(false);
+  };
+
   const today = new Date();
   const rdv = new Date(rdvDate);
   const start = new Date(startDate);
@@ -855,10 +876,61 @@ function ScreenSuivi({ go, appState }) {
         </button>
       </div>
 
-      <button className="history-link" onClick={() => go("synthese")}>
+      <div style={{ textAlign: "center", marginTop: 24 }} className="reveal">
+        <button className="btn btn-ghost" onClick={() => setIsEditing(true)} style={{ fontSize: 13, color: "var(--muted)", textDecoration: "underline" }}>
+          Paramètres du cycle
+        </button>
+      </div>
+
+      <button className="history-link reveal" onClick={() => go("synthese")} style={{ marginTop: 12 }}>
         Dernière observation · 11 mai
         <Icon name="arrow" size={15} stroke={1.8} color="#8E918A" />
       </button>
+
+      {isEditing && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, 
+          background: "rgba(0,0,0,0.5)", zIndex: 100,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+        }}>
+          <div className="card" style={{ padding: 24, width: "100%", maxWidth: 360, background: "var(--paper)" }}>
+            <h2 style={{ fontSize: 18, marginBottom: 16, fontFamily: "var(--serif)", color: "var(--ink)" }}>Paramètres du cycle</h2>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--slate)", fontWeight: 600 }}>Date de début du suivi</label>
+              <input 
+                type="date" 
+                value={editStart} 
+                onChange={(e) => setEditStart(e.target.value)} 
+                style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--line)" }} 
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--slate)", fontWeight: 600 }}>Prochaine consultation</label>
+              <input 
+                type="date" 
+                value={editRdv} 
+                onChange={(e) => setEditRdv(e.target.value)} 
+                style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--line)" }} 
+              />
+            </div>
+
+            {editError && <div style={{ color: "#d9534f", fontSize: 13, marginBottom: 16 }}>{editError}</div>}
+
+            <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSaveCycle}>Enregistrer</button>
+              <button className="btn btn-ghost" style={{ flex: 1, border: "1px solid var(--line)" }} onClick={() => setIsEditing(false)}>Annuler</button>
+            </div>
+
+            <div style={{ textAlign: "center", borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+              <button onClick={resetCycle} style={{ background: "none", border: "none", color: "#d9534f", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}>
+                Réinitialiser le suivi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1228,11 +1300,24 @@ function BottomNav({ screen, go }) {
 
 /* ---------------- ROOT ---------------- */
 export default function PacteApp() {
-  const [appState, setAppState] = useState({
-    hasOnboarded: false,
-    rdvDate: "",
-    startDate: "",
-    indicators: []
+  const [appState, setAppState] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pacteCycleSettings");
+      if (saved) {
+        return {
+          hasOnboarded: true,
+          ...JSON.parse(saved)
+        };
+      }
+    } catch (e) {
+      console.error("Failed to parse local settings", e);
+    }
+    return {
+      hasOnboarded: false,
+      rdvDate: "",
+      startDate: "",
+      indicators: []
+    };
   });
   const [screen, setScreen] = useState("suivi");
   const [from, setFrom] = useState("suivi");
@@ -1250,13 +1335,35 @@ export default function PacteApp() {
   const back = () => setScreen(from === "observation" ? "suivi" : from);
 
   const handleOnboarding = (data) => {
-    setAppState({
+    const newState = {
       hasOnboarded: true,
       ...data
-    });
+    };
+    setAppState(newState);
+    localStorage.setItem("pacteCycleSettings", JSON.stringify(data));
+    
     if (data.indicators.length > 0) {
       setObsKey(data.indicators[0].key);
     }
+  };
+
+  const updateCycleSettings = (startDate, rdvDate) => {
+    const newData = { ...appState, startDate, rdvDate };
+    setAppState(newData);
+    
+    const { hasOnboarded, ...dataToSave } = newData;
+    localStorage.setItem("pacteCycleSettings", JSON.stringify(dataToSave));
+  };
+
+  const resetCycle = () => {
+    localStorage.removeItem("pacteCycleSettings");
+    setAppState({
+      hasOnboarded: false,
+      rdvDate: "",
+      startDate: "",
+      indicators: []
+    });
+    setScreen("suivi");
   };
 
   if (!appState.hasOnboarded) {
@@ -1277,7 +1384,7 @@ export default function PacteApp() {
       <style>{CSS}</style>
       <div className="app-container">
         <div className="body">
-          {screen === "suivi" && <ScreenSuivi key="suivi" go={go} appState={appState} />}
+          {screen === "suivi" && <ScreenSuivi key="suivi" go={go} appState={appState} updateCycle={updateCycleSettings} resetCycle={resetCycle} />}
           {screen === "indicateurs" && (
             <ScreenIndicateurs key="indicateurs" go={go} openObs={openObs} indicators={appState.indicators} />
           )}
