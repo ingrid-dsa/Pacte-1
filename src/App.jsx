@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import logoImg from "./assets/LogoPacte.jpg";
 
 /* ============================================================
    PACTE — Prototype d'interface de suivi de santé
@@ -60,6 +61,10 @@ const CSS = `
   display:flex; align-items:center; justify-content:space-between;
   margin:0 -22px 16px;
   padding:calc(16px + env(safe-area-inset-top, 0px)) 22px 12px;
+}
+.logo{
+  height:36px; object-fit:contain;
+  mix-blend-mode:multiply; border-radius:4px;
 }
 .appbar .ghost{ width:36px; height:36px; }
 
@@ -689,6 +694,7 @@ function ScreenOnboarding({ onComplete }) {
   return (
     <div className="screen" style={{ paddingBottom: 60 }}>
       <div className="appbar" style={{ justifyContent: 'center', marginBottom: 24 }}>
+        <img src={logoImg} alt="Pacte Logo" className="logo" style={{height: 48, objectFit: 'contain'}} />
       </div>
       <h1 className="title" style={{textAlign: 'center', fontSize: 34, marginBottom: 10}}>Bienvenue</h1>
       <p className="subtitle" style={{textAlign: 'center', margin: '0 auto 40px', fontSize: 15, maxWidth: 300, lineHeight: 1.5}}>
@@ -781,6 +787,7 @@ function ScreenSuivi({ go, appState }) {
   return (
     <div className="screen">
       <div className="appbar">
+        <img src={logoImg} alt="Pacte Logo" className="logo" />
         <span className="ghost" />
       </div>
 
@@ -837,6 +844,7 @@ function ScreenIndicateurs({ go, openObs, indicators }) {
   return (
     <div className="screen">
       <div className="appbar">
+        <img src={logoImg} alt="Pacte Logo" className="logo" style={{height: 24}} />
         <span className="ghost" />
       </div>
       <div className="kicker">Mes indicateurs</div>
@@ -1032,6 +1040,7 @@ function ScreenSynthese() {
   return (
     <div className="screen">
       <div className="appbar">
+        <img src={logoImg} alt="Pacte Logo" className="logo" style={{height: 24}} />
         <span className="ghost" />
       </div>
       <div className="kicker">Synthèse</div>
@@ -1125,6 +1134,7 @@ function ScreenRessources() {
   return (
     <div className="screen">
       <div className="appbar">
+        <img src={logoImg} alt="Pacte Logo" className="logo" style={{height: 24}} />
         <span className="ghost" />
       </div>
       <div className="kicker">Ressources &amp; ETP</div>
