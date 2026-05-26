@@ -658,9 +658,6 @@ function IndicatorChart({ observations }) {
     </svg>
   );
 }
-    </svg>
-  );
-}
 
 /* ---------------- ONBOARDING ---------------- */
 function ScreenOnboarding({ onComplete }) {
@@ -1144,52 +1141,112 @@ function ScreenObservation({ back, startKey, indicators, onSave }) {
 }
 
 /* ---------------- SCREEN : SYNTHÈSE ---------------- */
-function ScreenSynthese() {
-  const data = [7, 6, 7, 5, 6, 4, 5, 6];
-  const W = 308, H = 96, pad = 10;
-  const min = 0, max = 10;
-  const pts = data.map((v, i) => {
-    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
-    const y = pad + (1 - (v - min) / (max - min)) * (H - pad * 2);
-    return [x, y];
-  });
-  const linePath = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  const areaPath =
-    `M${pts[0][0].toFixed(1)} ${(H - pad).toFixed(1)} ` +
-    pts.map((p) => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ") +
-    ` L${pts[pts.length - 1][0].toFixed(1)} ${(H - pad).toFixed(1)} Z`;
+function ScreenSynthese({ appState, updateNotes }) {
+  const W = 308, H = 140, pad = 10;
+  
+  const colors = {
+    "fatigue": "#35462D",
+    "douleur": "#4F7C72",
+    "sommeil": "#7C9A92",
+    "humeur": "#D9BB84",
+    "mobilite": "#9BAF88",
+    "effets": "#B88A5A"
+  };
+  const fallbackColors = ["#35462D", "#4F7C72", "#7C9A92", "#D9BB84", "#9BAF88", "#B88A5A"];
+  const getColor = (key, idx) => colors[key] || fallbackColors[idx % fallbackColors.length];
 
-  const blocks = [
-    {
-      n: 3, title: "Évolutions notables",
-      items: [
-        "Fatigue moins intense qu’en début de cycle",
-        "Douleur stable et bien tolérée au quotidien",
-        "Sommeil encore irrégulier selon les nuits",
-      ],
-    },
-    {
-      n: 2, title: "Points à signaler",
-      items: [
-        "Fatigue récurrente en fin d’après-midi",
-        "Effets secondaires digestifs ponctuels",
-      ],
-    },
-    {
-      n: 3, title: "Questions à poser",
-      items: [
-        "Peut-on ajuster le moment de la prise ?",
-        "Que faire en cas d’oubli d’une dose ?",
-        "Faut-il réévaluer l’activité physique ?",
-      ],
-    },
-  ];
+  const indicatorsWithData = (appState?.indicators || []).filter(ind => 
+    (appState.observations || []).some(o => o.indicatorKey === ind.key)
+  );
 
-  const recent = [
-    { when: "Aujourd’hui · 11 mai", tag: "Fatigue 6/10", quote: "« Journée plus difficile, fatigue marquée en après-midi. »" },
-    { when: "8 mai", tag: "Sommeil 5/10", quote: "« Réveils nocturnes, mais endormissement plus rapide. »" },
-    { when: "5 mai", tag: "Douleur 3/10", quote: "« Gêne légère, supportable au quotidien. »" },
-  ];
+  const allObs = [...(appState?.observations || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
+  const minTime = allObs.length > 0 ? new Date(allObs[0].date).getTime() : 0;
+  const maxTime = allObs.length > 0 ? new Date(allObs[allObs.length - 1].date).getTime() : 0;
+  const timeSpan = Math.max(1, maxTime - minTime);
+
+  const getPoints = (obsList) => {
+    return obsList.map(obs => {
+      const time = new Date(obs.date).getTime();
+      const x = pad + ((time - minTime) / timeSpan) * (W - pad * 2);
+      const y = pad + (1 - obs.value / 10) * (H - pad * 2);
+      return [x, y];
+    });
+  };
+
+  const getLinePath = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+
+  const { evolutions, points, questions } = appState?.preConsultationNotes || { evolutions: "", points: "", questions: "" };
+
+  const handleNoteChange = (field, val) => {
+    updateNotes({ [field]: val });
+  };
+  
+  const printSynthesis = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return alert("Veuillez autoriser les pop-ups pour générer la synthèse.");
+    
+    const obsHTML = indicatorsWithData.map(ind => {
+      const obs = allObs.filter(o => o.indicatorKey === ind.key);
+      const avg = (obs.reduce((sum, o) => sum + o.value, 0) / obs.length).toFixed(1);
+      const notesHTML = obs.filter(o => o.notes).map(o => `<li style="margin-bottom:8px"><strong>${new Date(o.date).toLocaleDateString()} :</strong> ${o.notes}</li>`).join('');
+      
+      return `
+        <div style="margin-bottom: 20px;">
+          <h3>${ind.name} (Moyenne : ${avg}/10, Dernière : ${obs[obs.length-1].value}/10)</h3>
+          ${notesHTML ? `<ul style="padding-left:20px">${notesHTML}</ul>` : '<p style="color:#666"><i>Aucune note renseignée pour cet indicateur.</i></p>'}
+        </div>
+      `;
+    }).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Synthèse de suivi - Pacte</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #333; line-height: 1.5; padding: 20px; max-width: 800px; margin: 0 auto; }
+            h1 { color: #35462D; border-bottom: 2px solid #E8E7E1; padding-bottom: 10px; }
+            h2 { color: #4F7C72; margin-top: 35px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            h3 { color: #555; margin-bottom: 10px; font-size: 16px; }
+            .header { margin-bottom: 40px; }
+            .notes-section { background: #f9f9f9; padding: 15px; border-left: 4px solid #7C9A92; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
+            .disclaimer { font-size: 12px; color: #888; margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Synthèse de suivi</h1>
+            <p><strong>Date de début du suivi :</strong> ${new Date(appState.startDate).toLocaleDateString()}</p>
+            <p><strong>Prochaine consultation :</strong> ${appState.rdvDate ? new Date(appState.rdvDate).toLocaleDateString() : 'Non définie'}</p>
+          </div>
+          
+          <h2>Indicateurs suivis</h2>
+          ${obsHTML || '<p>Aucune donnée saisie.</p>'}
+
+          <h2>Notes de préparation pour le rendez-vous</h2>
+          <div class="notes-section">
+            <h3 style="margin-top:0">Évolutions notables</h3>
+            <p style="margin-bottom:0; white-space: pre-wrap;">${evolutions || '<i>Non renseigné</i>'}</p>
+          </div>
+          <div class="notes-section">
+            <h3 style="margin-top:0">Points à signaler</h3>
+            <p style="margin-bottom:0; white-space: pre-wrap;">${points || '<i>Non renseigné</i>'}</p>
+          </div>
+          <div class="notes-section">
+            <h3 style="margin-top:0">Questions à poser</h3>
+            <p style="margin-bottom:0; white-space: pre-wrap;">${questions || '<i>Non renseigné</i>'}</p>
+          </div>
+
+          <p class="disclaimer">Cette synthèse prépare l'échange médical. Elle ne remplace pas l'avis d'un professionnel de santé.</p>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
 
   return (
     <div className="screen">
@@ -1199,57 +1256,106 @@ function ScreenSynthese() {
       </div>
       <div className="kicker">Synthèse</div>
       <h1 className="title">Préparer le<br />prochain échange</h1>
-      <p className="section-intro">Aperçu de vos observations depuis le 11 mars.</p>
+      <p className="section-intro">Aperçu de vos observations pour ce cycle.</p>
 
-      <div className="card chart-card reveal" style={{ animationDelay: ".05s" }}>
-        <div className="chart-head">
-          <span className="chart-title">Fatigue</span>
-          <span className="chart-meta">8 dernières observations</span>
+      <div className="card chart-card reveal" style={{ animationDelay: ".05s", paddingBottom: 15 }}>
+        <div className="chart-head" style={{ marginBottom: 10 }}>
+          <span className="chart-title">Évolution globale</span>
         </div>
-        <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
-          <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad}
-            stroke="#E8E7E1" strokeWidth="1" />
-          <path className="chart-area" d={areaPath} />
-          <path className="chart-line" d={linePath} />
-          {pts.map((p, i) => (
-            <circle key={i} className="chart-dot" cx={p[0]} cy={p[1]} r="3" />
-          ))}
-        </svg>
+        {allObs.length > 0 ? (
+          <>
+            <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+              <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#E8E7E1" strokeWidth="1" />
+              {indicatorsWithData.map((ind, i) => {
+                const obs = allObs.filter(o => o.indicatorKey === ind.key);
+                if (obs.length < 2 && allObs.length > 1) return null; // Wait for at least 2 points to draw line unless it's the only one
+                const pts = getPoints(obs);
+                const color = getColor(ind.key, i);
+                
+                if (pts.length === 1) {
+                  return <circle key={ind.key} cx={pts[0][0]} cy={pts[0][1]} r="4" fill={color} />;
+                }
+
+                return (
+                  <g key={ind.key}>
+                    <path d={getLinePath(pts)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    {pts.map((p, j) => <circle key={j} cx={p[0]} cy={p[1]} r="3" fill={color} />)}
+                  </g>
+                );
+              })}
+            </svg>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16, fontSize: 13 }}>
+              {indicatorsWithData.map((ind, i) => (
+                <div key={ind.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: getColor(ind.key, i) }} />
+                  <span style={{ color: "var(--ink)" }}>{ind.name}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: 13, color: "var(--muted)" }}>Aucune observation enregistrée pour tracer un graphique.</p>
+        )}
       </div>
 
-      <div className="field-label" style={{ marginTop: 22 }}>Observations récentes</div>
-      {recent.map((r, i) => (
-        <div key={i} className="card obs-item reveal" style={{ animationDelay: `${0.1 + i * 0.05}s` }}>
-          <div className="obs-item-top">
-            <span className="obs-when">{r.when}</span>
-            <span className="obs-tag">{r.tag}</span>
-          </div>
-          <div className="obs-quote">{r.quote}</div>
-        </div>
-      ))}
-
-      <div className="field-label" style={{ marginTop: 22 }}>Pour le rendez-vous</div>
-      {blocks.map((b, i) => (
-        <div key={i} className="card synth-block reveal" style={{ animationDelay: `${0.15 + i * 0.06}s` }}>
-          <div className="synth-head">
-            <span className="synth-badge">{b.n}</span>
-            <h4>{b.title}</h4>
-          </div>
-          {b.items.map((it, j) => (
-            <div key={j} className="synth-li">
-              <span className="mk" />
-              <span>{it}</span>
+      <div className="field-label" style={{ marginTop: 26, marginBottom: 12 }}>Observations récentes</div>
+      {indicatorsWithData.length > 0 ? indicatorsWithData.map((ind, i) => {
+        const obs = allObs.filter(o => o.indicatorKey === ind.key);
+        const avg = (obs.reduce((sum, o) => sum + o.value, 0) / obs.length).toFixed(1);
+        const withNotes = obs.filter(o => o.notes);
+        
+        return (
+          <div key={ind.key} className="card obs-item reveal" style={{ animationDelay: `${0.1 + i * 0.05}s`, padding: "16px", marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontWeight: 600, color: "var(--ink)", fontSize: 15 }}>{ind.name}</span>
+              <span style={{ color: "var(--slate)", fontSize: 13 }}>Moyenne : <strong style={{ color: "var(--green)" }}>{avg}</strong> / 10</span>
             </div>
-          ))}
+            {withNotes.length > 0 ? (
+              <ul style={{ paddingLeft: 20, margin: 0, fontSize: 14, color: "var(--slate)", lineHeight: 1.5 }}>
+                {withNotes.map(o => (
+                  <li key={o.id} style={{ marginBottom: 8 }}>
+                    <strong style={{ color: "var(--ink)" }}>{new Date(o.date).toLocaleDateString()} :</strong> {o.notes}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, fontStyle: "italic" }}>Aucune note renseignée pour cet indicateur.</p>
+            )}
+          </div>
+        );
+      }) : (
+        <div className="card obs-item reveal" style={{ padding: "16px", marginBottom: 12 }}>
+          <div className="obs-item-top">
+            <span className="obs-when">Exemple</span>
+            <span className="obs-tag">Fatigue</span>
+          </div>
+          <div className="obs-quote">« C'est ici que vos observations apparaîtront une fois saisies. »</div>
         </div>
-      ))}
+      )}
 
-      <p className="disclaimer">
+      <div className="field-label" style={{ marginTop: 26, marginBottom: 12 }}>Pour le rendez-vous</div>
+      
+      <div className="card synth-block reveal" style={{ animationDelay: "0.15s", padding: "16px 16px 8px", marginBottom: 12 }}>
+        <h4 style={{ margin: "0 0 10px 0", color: "var(--ink)", fontSize: 15 }}>Évolutions notables</h4>
+        <textarea className="notes" style={{ minHeight: 80, border: "none", background: "var(--bg)", padding: 12, borderRadius: 8, fontSize: 14 }} placeholder="Notez les changements que vous avez observés depuis le début du cycle." value={evolutions} onChange={e => handleNoteChange('evolutions', e.target.value)} />
+      </div>
+
+      <div className="card synth-block reveal" style={{ animationDelay: "0.20s", padding: "16px 16px 8px", marginBottom: 12 }}>
+        <h4 style={{ margin: "0 0 10px 0", color: "var(--ink)", fontSize: 15 }}>Points à signaler</h4>
+        <textarea className="notes" style={{ minHeight: 80, border: "none", background: "var(--bg)", padding: 12, borderRadius: 8, fontSize: 14 }} placeholder="Notez les symptômes, effets secondaires ou difficultés que vous souhaitez signaler." value={points} onChange={e => handleNoteChange('points', e.target.value)} />
+      </div>
+
+      <div className="card synth-block reveal" style={{ animationDelay: "0.25s", padding: "16px 16px 8px", marginBottom: 12 }}>
+        <h4 style={{ margin: "0 0 10px 0", color: "var(--ink)", fontSize: 15 }}>Questions à poser</h4>
+        <textarea className="notes" style={{ minHeight: 80, border: "none", background: "var(--bg)", padding: 12, borderRadius: 8, fontSize: 14 }} placeholder="Préparez ici les questions que vous voulez poser lors de la consultation." value={questions} onChange={e => handleNoteChange('questions', e.target.value)} />
+      </div>
+
+      <p className="disclaimer" style={{ marginTop: 24 }}>
         Cette synthèse prépare l&#8217;échange. Elle ne remplace pas l&#8217;avis médical.
       </p>
 
-      <div className="btn-row" style={{ marginTop: 10 }}>
-        <button className="btn btn-ghost">
+      <div className="btn-row" style={{ marginTop: 10, marginBottom: 24 }}>
+        <button className="btn btn-ghost" onClick={printSynthesis}>
           <Icon name="download" size={17} stroke={1.8} color="#35462D" />
           Télécharger le résumé
         </button>
