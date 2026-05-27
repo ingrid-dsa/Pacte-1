@@ -664,11 +664,17 @@ function IndicatorChart({ observations, color = "#35462D", showLabels = true }) 
       ))}
 
       {pts.length > 1 && (
-        <polyline
-          points={pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}
-          fill="none" stroke={color} strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round"
-        />
+        <>
+          <polygon
+            points={padH + "," + getY(1) + " " + pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ") + " " + pts[pts.length - 1][0].toFixed(1) + "," + getY(1)}
+            fill={color} opacity="0.1"
+          />
+          <polyline
+            points={pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}
+            fill="none" stroke={color} strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round"
+          />
+        </>
       )}
       {pts.map((p, i) => (
         <g key={i}>
@@ -931,7 +937,7 @@ function ScreenSuivi({ go, appState, updateCycle, resetCycle }) {
       <div className="btn-row reveal" style={{ animationDelay: ".2s" }}>
         <button className="btn btn-primary" onClick={() => go("observation")}>
           <Icon name="plus" size={18} stroke={2} color="#F4F2EC" />
-          + Suivi
+          Suivre
         </button>
         <button className="btn btn-ghost" onClick={() => go("synthese")}>
           Voir ma synthèse
@@ -1222,9 +1228,8 @@ function ScreenSynthese({ appState, updateNotes }) {
   const allObs = [...(appState?.observations || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
 
   const getPoints = (obsList) => {
-    return obsList.map(obs => {
-      const idx = allObs.findIndex(o => o.id === obs.id);
-      const x = pad + 15 + (allObs.length > 1 ? (idx / (allObs.length - 1)) * (W - pad * 2 - 15) : (W - pad * 2 - 15) / 2);
+    return obsList.map((obs, idx) => {
+      const x = pad + 15 + (obsList.length > 1 ? (idx / (obsList.length - 1)) * (W - pad * 2 - 15) : (W - pad * 2 - 15) / 2);
       const y = pad + (1 - obs.value / 10) * (H - pad * 2);
       return [x, y];
     });
@@ -1299,7 +1304,44 @@ function ScreenSynthese({ appState, updateNotes }) {
     html += "<p><strong>Prochaine consultation :</strong> " + rdvD + "</p>";
     html += "</div>";
     
+    let svgHTML = "<div style=\"margin-bottom:30px; border:1px solid #eee; padding:20px; border-radius:8px; background:#fff;\">";
+    svgHTML += "<svg width=\"100%\" viewBox=\"0 0 " + W + " " + H + "\" style=\"overflow:visible\">";
+    
+    [1, 5, 10].forEach(val => {
+      const y = pad + (1 - val / 10) * (H - pad * 2);
+      svgHTML += "<line x1=\"" + (pad + 15) + "\" y1=\"" + y + "\" x2=\"" + (W - pad) + "\" y2=\"" + y + "\" stroke=\"#E8E7E1\" stroke-width=\"1\" stroke-dasharray=\"2 2\" />";
+      svgHTML += "<text x=\"" + (pad + 10) + "\" y=\"" + (y + 3) + "\" font-size=\"9\" fill=\"#888\" text-anchor=\"end\">" + val + "</text>";
+    });
+
+    indicatorsWithData.forEach((ind, i) => {
+      const obs = allObs.filter(o => o.indicatorKey === ind.key);
+      const pts = getPoints(obs);
+      const color = getColor(ind.key, i);
+      
+      if (pts.length === 1) {
+        svgHTML += "<circle cx=\"" + pts[0][0] + "\" cy=\"" + pts[0][1] + "\" r=\"4\" fill=\"" + color + "\" />";
+      } else if (pts.length > 1) {
+        const polyPoints = (pad + 15) + "," + (pad + (1 - 1 / 10) * (H - pad * 2)) + " " + pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ") + " " + pts[pts.length - 1][0].toFixed(1) + "," + (pad + (1 - 1 / 10) * (H - pad * 2));
+        svgHTML += "<polygon points=\"" + polyPoints + "\" fill=\"" + color + "\" opacity=\"0.1\" />";
+        svgHTML += "<path d=\"" + getLinePath(pts) + "\" fill=\"none\" stroke=\"" + color + "\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />";
+        pts.forEach(p => {
+          svgHTML += "<circle cx=\"" + p[0] + "\" cy=\"" + p[1] + "\" r=\"3\" fill=\"" + color + "\" />";
+        });
+      }
+    });
+    svgHTML += "</svg>";
+    
+    svgHTML += "<div style=\"display:flex; flex-wrap:wrap; gap:12px; margin-top:20px; font-size:13px;\">";
+    indicatorsWithData.forEach((ind, i) => {
+      svgHTML += "<div style=\"display:flex; align-items:center; gap:6px;\">";
+      svgHTML += "<span style=\"width:10px; height:10px; border-radius:50%; background:" + getColor(ind.key, i) + "; display:inline-block;\"></span>";
+      svgHTML += "<span>" + ind.name + "</span>";
+      svgHTML += "</div>";
+    });
+    svgHTML += "</div></div>";
+
     html += "<h2>Indicateurs suivis</h2>";
+    html += (allObs.length > 0 ? svgHTML : "");
     html += (obsHTML || "<p>Aucune donnée saisie.</p>");
     
     html += "<h2>Récapitulatif des observations</h2>";
@@ -1364,6 +1406,12 @@ function ScreenSynthese({ appState, updateNotes }) {
 
                 return (
                   <g key={ind.key}>
+                    {pts.length > 1 && (
+                      <polygon
+                        points={(pad + 15) + "," + (pad + (1 - 1 / 10) * (H - pad * 2)) + " " + pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ") + " " + pts[pts.length - 1][0].toFixed(1) + "," + (pad + (1 - 1 / 10) * (H - pad * 2))}
+                        fill={color} opacity="0.1"
+                      />
+                    )}
                     <path d={getLinePath(pts)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     {pts.map((p, j) => <circle key={j} cx={p[0]} cy={p[1]} r="3" fill={color} />)}
                   </g>
